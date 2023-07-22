@@ -3,6 +3,7 @@ app "brainroc"
         pf: "https://github.com/roc-lang/basic-cli/releases/download/0.3.2/tE4xS_zLdmmxmHwHih9kHWQ7fsXtJr7W7h3425-eZFk.tar.br",
     }
     imports [
+        pf.Arg,
         pf.File,
         pf.Path,
         pf.Stdout,
@@ -96,25 +97,36 @@ bottles =
 
 main =
   # sourceCode = helloWorld |> Str.toUtf8
+  parser =
+    Arg.str { name: "input", help: "The BF file to be interpreted." }
+    |> Arg.program { name: "brainroc", help: "A BF interpreter." }
 
-  inputFilePath = "./sierpinski.bf"
-  fileContents <- inputFilePath |> Path.fromStr |> File.readBytes |> Task.attempt
-  when fileContents is
-    Err  _ ->
-      "Failed to read the input file `\(inputFilePath)`." |> Stdout.line
-    Ok sourceCode ->
-      dbg sourceCode
-      program = tokenize sourceCode
-      dbg program
-      state = initialState program
-      dbg state
-      outputBytes = run state
-      dbg outputBytes
-      outputStr = 
-        when Str.fromUtf8 outputBytes is
-                Err _ -> crash "invalid utf8 in the output"
-                Ok str -> str
-      Stdout.line outputStr
+  # Get a list of the commandline arguments passed to the program
+  args <- Arg.list |> Task.await
+
+  # Parse the commandline arguments
+  when Arg.parseFormatted parser (args) is
+      # Show the help information
+      Err helpInfo ->
+        helpInfo |> Stdout.line
+      Ok inputFilePath ->
+        fileContents <- inputFilePath |> Path.fromStr |> File.readBytes |> Task.attempt
+        when fileContents is
+          Err  _ ->
+            "Failed to read the input file `\(inputFilePath)`." |> Stdout.line
+          Ok sourceCode ->
+            dbg sourceCode
+            program = tokenize sourceCode
+            dbg program
+            state = initialState program
+            dbg state
+            outputBytes = run state
+            dbg outputBytes
+            outputStr = 
+              when Str.fromUtf8 outputBytes is
+                      Err _ -> crash "invalid utf8 in the output"
+                      Ok str -> str
+            Stdout.line outputStr
 
 Op : [
   Next,
@@ -201,7 +213,7 @@ State : {
   iter: Nat,
 }
 
-dataSize = 1_000
+dataSize = 500
 
 initialState : List Op -> State
 initialState = \program ->
@@ -230,35 +242,38 @@ runOne = \state ->
     Err (Done state)
   else
     op = getUnsafe state.program state.programCounter
-    when op is
-      Next ->
-        Ok {state & dataCounter: state.dataCounter + 1}
-      Prev ->
-        Ok {state & dataCounter: state.dataCounter - 1}
-      Inc ->
-        data = List.update state.data state.dataCounter (\x -> Num.addWrap x 1)
-        Ok {state & data}
-      Dec ->
-        data = List.update state.data state.dataCounter (\x -> Num.subWrap x 1)
-        Ok {state & data}
-      Input ->
-        crash "Input (,) is not implemented yet"
-      Output ->
-        val = getUnsafe state.data state.dataCounter
-        output2 = List.append state.output val
-        Ok {state & output: output2}
-      JumpForward targetLocation ->
-        val = getUnsafe state.data state.dataCounter
-        if val == 0 then
-          Ok {state & programCounter: targetLocation}
-        else
-          Ok state
-      JumpBackward targetLocation ->
-        val = getUnsafe state.data state.dataCounter
-        if val != 0 then
-          Ok {state & programCounter: targetLocation}
-        else
-          Ok state
+    state2 =
+      when op is
+        Next ->
+          Ok {state & dataCounter: state.dataCounter + 1}
+        Prev ->
+          Ok {state & dataCounter: state.dataCounter - 1}
+        Inc ->
+          data = List.update state.data state.dataCounter (\x -> Num.addWrap x 1)
+          Ok {state & data}
+        Dec ->
+          data = List.update state.data state.dataCounter (\x -> Num.subWrap x 1)
+          Ok {state & data}
+        Input ->
+          crash "Input (,) is not implemented yet"
+        Output ->
+          val = getUnsafe state.data state.dataCounter
+          output2 = List.append state.output val
+          Ok {state & output: output2}
+        JumpForward targetLocation ->
+          val = getUnsafe state.data state.dataCounter
+          if val == 0 then
+            Ok {state & programCounter: targetLocation}
+          else
+            Ok state
+        JumpBackward targetLocation ->
+          val = getUnsafe state.data state.dataCounter
+          if val != 0 then
+            Ok {state & programCounter: targetLocation}
+          else
+            Ok state
+    dbg state2
+    state2
 pop : List a -> Result (a, List a) [ListWasEmpty]
 pop = \list ->
   when List.last list is
