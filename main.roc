@@ -37,7 +37,7 @@ main =
             dbg state
             outputBytes = run state
             dbg outputBytes
-            outputStr = 
+            outputStr =
               when Str.fromUtf8 outputBytes is
                       Err _ -> crash "invalid utf8 in the output"
                       Ok str -> str
@@ -106,11 +106,11 @@ tokenizeOne = \(pc, instructions, jumpStack), char ->
 
     other ->
       when Str.fromUtf8 [ other ] is
-          Ok str -> 
-              crash "unexpected character: '\(str)'" 
+          Ok str ->
+              crash "unexpected character: '\(str)'"
 
-          Err _ -> 
-              crash "unexpected non-utf8 character"  
+          Err _ ->
+              crash "unexpected non-utf8 character"
 
 patchJump : Nat, Op -> Op
 patchJump = \targetLocation, op ->
