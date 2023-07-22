@@ -3,10 +3,10 @@ app "brainroc"
         pf: "https://github.com/roc-lang/basic-cli/releases/download/0.3.2/tE4xS_zLdmmxmHwHih9kHWQ7fsXtJr7W7h3425-eZFk.tar.br",
     }
     imports [
-        # pf.File,
-        # pf.Path,
+        pf.File,
+        pf.Path,
         pf.Stdout,
-        # pf.Task,
+        pf.Task,
     ]
     provides [main] to pf
 
@@ -95,19 +95,37 @@ bottles =
 
 
 main =
-  sourceCode = bottles |> Str.toUtf8
-  dbg sourceCode
-  program = tokenize sourceCode
-  dbg program
-  state = initialState program
-  dbg state
-  outputBytes = run state
-  dbg outputBytes
-  outputStr = 
-    when Str.fromUtf8 outputBytes is
-            Err _ -> crash "invalid utf8 in the output"
-            Ok str -> str
-  Stdout.line outputStr
+  # sourceCode = helloWorld |> Str.toUtf8
+
+  inputFilePath = "./sierpinski.bf"
+  fileContents <- inputFilePath |> Path.fromStr |> File.readBytes |> Task.attempt
+  when fileContents is
+    Err  _ ->
+      "Failed to read the input file `\(inputFilePath)`." |> Stdout.line
+    Ok sourceCode ->
+      dbg sourceCode
+      program = tokenize sourceCode
+      dbg program
+      state = initialState program
+      dbg state
+      outputBytes = run state
+      dbg outputBytes
+      outputStr = 
+        when Str.fromUtf8 outputBytes is
+                Err _ -> crash "invalid utf8 in the output"
+                Ok str -> str
+      Stdout.line outputStr
+
+Op : [
+  Next,
+  Prev,
+  Inc,
+  Dec,
+  Input,
+  Output,
+  JumpForward Nat,
+  JumpBackward Nat,
+]
 
 tokenize : List U8 -> List Op
 tokenize = \bytes ->
@@ -174,19 +192,6 @@ patchJump = \targetLocation, op ->
       JumpForward targetLocation
     _ ->
       crash "Incorrect jump patch"
-
-Op : [
-  Next,
-  Prev,
-  Inc,
-  Dec,
-  Input,
-  Output,
-  JumpForward Nat,
-  JumpBackward Nat,
-]
-
-
 State : {
   program: List Op,
   programCounter: Nat,
@@ -209,46 +214,6 @@ initialState = \program ->
     iter: 0
   }
 
-runOne : State -> Result State [Done State]
-runOne = \state ->
-  if state.programCounter >= List.len state.program then
-    Err (Done state)
-  else
-    op = getUnsafe state.program state.programCounter
-    state2 =
-      when op is
-        Next ->
-          {state & dataCounter: state.dataCounter + 1}
-        Prev ->
-          {state & dataCounter: state.dataCounter - 1}
-        Inc ->
-          data = List.update state.data state.dataCounter (\x -> Num.addWrap x 1)
-          {state & data}
-        Dec ->
-          data = List.update state.data state.dataCounter (\x -> Num.subWrap x 1)
-          {state & data}
-        Input ->
-          crash "Input (,) is not implemented yet"
-        Output ->
-          val = getUnsafe state.data state.dataCounter
-          output2 = List.append state.output val
-          {state & output: output2}
-        JumpForward targetLocation ->
-          val = getUnsafe state.data state.dataCounter
-          if val == 0 then
-            {state & programCounter: targetLocation}
-          else
-            state
-        JumpBackward targetLocation ->
-          val = getUnsafe state.data state.dataCounter
-          if val != 0 then
-            {state & programCounter: targetLocation}
-          else
-            state
-          
-    dbg state2
-    Ok state2
-
 run : State -> List U8
 run = \state ->
   when runOne state is
@@ -259,6 +224,41 @@ run = \state ->
     Err (Done state2) ->
       state2.output
 
+runOne : State -> Result State [Done State]
+runOne = \state ->
+  if state.programCounter >= List.len state.program then
+    Err (Done state)
+  else
+    op = getUnsafe state.program state.programCounter
+    when op is
+      Next ->
+        Ok {state & dataCounter: state.dataCounter + 1}
+      Prev ->
+        Ok {state & dataCounter: state.dataCounter - 1}
+      Inc ->
+        data = List.update state.data state.dataCounter (\x -> Num.addWrap x 1)
+        Ok {state & data}
+      Dec ->
+        data = List.update state.data state.dataCounter (\x -> Num.subWrap x 1)
+        Ok {state & data}
+      Input ->
+        crash "Input (,) is not implemented yet"
+      Output ->
+        val = getUnsafe state.data state.dataCounter
+        output2 = List.append state.output val
+        Ok {state & output: output2}
+      JumpForward targetLocation ->
+        val = getUnsafe state.data state.dataCounter
+        if val == 0 then
+          Ok {state & programCounter: targetLocation}
+        else
+          Ok state
+      JumpBackward targetLocation ->
+        val = getUnsafe state.data state.dataCounter
+        if val != 0 then
+          Ok {state & programCounter: targetLocation}
+        else
+          Ok state
 pop : List a -> Result (a, List a) [ListWasEmpty]
 pop = \list ->
   when List.last list is
