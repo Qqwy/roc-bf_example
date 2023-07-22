@@ -129,7 +129,7 @@ State : {
   iter: Nat,
 }
 
-dataSize = 1000
+dataSize = 100
 
 initialState : List Op -> State
 initialState = \program ->
@@ -161,33 +161,21 @@ runOne = \state ->
     state2 =
       when op is
         Next ->
-          {state & dataCounter: (Num.addWrap state.dataCounter 1)}
+          next state
         Prev ->
-          {state & dataCounter: (Num.subWrap state.dataCounter  1)}
+          prev state
         Inc ->
-          data = List.update state.data state.dataCounter (\x -> Num.addWrap x 1)
-          {state & data}
+          inc state
         Dec ->
-          data = List.update state.data state.dataCounter (\x -> Num.subWrap x 1)
-          {state & data}
+          dec state
         Input ->
-          crash "Input (,) is not implemented yet"
+          input state
         Output ->
-          val = getUnsafe state.data state.dataCounter
-          output2 = List.append state.output val
-          {state & output: output2}
+          output state
         JumpForward targetLocation ->
-          val = getUnsafe state.data state.dataCounter
-          if val == 0 then
-            {state & programCounter: targetLocation}
-          else
-            state
+          jumpForward state targetLocation
         JumpBackward targetLocation ->
-          val = getUnsafe state.data state.dataCounter
-          if val != 0 then
-            {state & programCounter: targetLocation}
-          else
-            state
+          jumpBackward state targetLocation
 
       # If your dataSize is large, you probably do not want to print it anymore.
       dbg state2
@@ -212,3 +200,40 @@ getUnsafe = \list, index ->
       crash "Out of bounds"
     Ok val ->
       val
+
+next = \state ->
+  {state & dataCounter: (Num.addWrap state.dataCounter 1)}
+
+prev = \state ->
+  {state & dataCounter: (Num.subWrap state.dataCounter  1)}
+
+inc = \state ->
+  data = List.update state.data state.dataCounter (\x -> Num.addWrap x 1)
+  {state & data}
+
+dec = \state ->
+  data = List.update state.data state.dataCounter (\x -> Num.subWrap x 1)
+  {state & data}
+
+input = \_state ->
+  crash "Input (,) is not implemented yet"
+
+output = \state ->
+  val = getUnsafe state.data state.dataCounter
+  output2 = List.append state.output val
+  {state & output: output2}
+
+jumpForward = \state, targetLocation ->
+  val = getUnsafe state.data state.dataCounter
+  if val == 0 then
+    {state & programCounter: targetLocation}
+  else
+    state
+
+jumpBackward = \state, targetLocation ->
+  val = getUnsafe state.data state.dataCounter
+  if val != 0 then
+    {state & programCounter: targetLocation}
+  else
+    state
+
