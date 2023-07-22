@@ -11,7 +11,15 @@ app "brainroc"
     provides [main] to pf
 
 main =
-  Stdout.line "Hello, world!"
+  sourceCode = "+++++++++++++++++++++++++++++++++++++++++++." |> Str.toUtf8
+  program = tokenize sourceCode
+  state = initialState program
+  outputBytes = run state
+  outputStr = 
+    when Str.fromUtf8 outputBytes is
+            Err _ -> crash "invalid utf8 in the output"
+            Ok str -> str
+  Stdout.line outputStr
 
 tokenize : List U8 -> List Op
 tokenize = \bytes ->
@@ -113,7 +121,7 @@ initialState = \program ->
 
 runOne : State -> Result State [Done State]
 runOne = \state ->
-  if state.programCounter > List.len state.program then
+  if state.programCounter >= List.len state.program then
     Err (Done state)
   else
     op = getUnsafe state.program state.programCounter
@@ -154,7 +162,8 @@ run : State -> List U8
 run = \state ->
   when runOne state is
     Ok state2 ->
-      run state2
+      programCounter = state2.programCounter + 1
+      run {state2 & programCounter}
     Err (Done state2) ->
       state2.output
 
