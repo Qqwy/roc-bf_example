@@ -41,6 +41,7 @@ main =
               when Str.fromUtf8 outputBytes is
                       Err _ -> crash "invalid utf8 in the output"
                       Ok str -> str
+            dbg outputStr
             Stdout.line outputStr
 
 Op : [
@@ -128,7 +129,7 @@ State : {
   iter: Nat,
 }
 
-dataSize = 500
+dataSize = 1000
 
 initialState : List Op -> State
 initialState = \program ->
@@ -145,8 +146,8 @@ run : State -> List U8
 run = \state ->
   when runOne state is
     Ok state2 ->
-      programCounter = state2.programCounter + 1
-      iter = state2.iter + 1
+      programCounter = Num.addWrap state2.programCounter  1
+      iter = Num.addWrap state2.iter 1
       run {state2 & programCounter, iter}
     Err (Done state2) ->
       state2.output
@@ -160,35 +161,42 @@ runOne = \state ->
     state2 =
       when op is
         Next ->
-          Ok {state & dataCounter: state.dataCounter + 1}
+          {state & dataCounter: (Num.addWrap state.dataCounter 1)}
         Prev ->
-          Ok {state & dataCounter: state.dataCounter - 1}
+          {state & dataCounter: (Num.subWrap state.dataCounter  1)}
         Inc ->
           data = List.update state.data state.dataCounter (\x -> Num.addWrap x 1)
-          Ok {state & data}
+          {state & data}
         Dec ->
           data = List.update state.data state.dataCounter (\x -> Num.subWrap x 1)
-          Ok {state & data}
+          {state & data}
         Input ->
           crash "Input (,) is not implemented yet"
         Output ->
           val = getUnsafe state.data state.dataCounter
           output2 = List.append state.output val
-          Ok {state & output: output2}
+          {state & output: output2}
         JumpForward targetLocation ->
           val = getUnsafe state.data state.dataCounter
           if val == 0 then
-            Ok {state & programCounter: targetLocation}
+            {state & programCounter: targetLocation}
           else
-            Ok state
+            state
         JumpBackward targetLocation ->
           val = getUnsafe state.data state.dataCounter
           if val != 0 then
-            Ok {state & programCounter: targetLocation}
+            {state & programCounter: targetLocation}
           else
-            Ok state
-    dbg state2
-    state2
+            state
+
+      # If your dataSize is large, you probably do not want to print it anymore.
+      dbg state2
+      # dbg state2.iter
+      # dbg state2.programCounter
+      # dbg state2.dataCounter
+      # dbg state2.output
+      Ok state2
+
 pop : List a -> Result (a, List a) [ListWasEmpty]
 pop = \list ->
   when List.last list is
