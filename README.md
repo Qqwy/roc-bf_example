@@ -2,13 +2,13 @@
 
 ```
 roc build --optimize ./main.roc
-./brainroc ./helloworld.bf
+./brainroc ./examples/helloworld.bf
 ```
 
 # To debug
 
 ```bash
-roc dev ./main.roc -- ./helloworld.bf
+roc dev ./main.roc -- ./examples/helloworld.bf
 ```
 
 which will print `dbg` statements
